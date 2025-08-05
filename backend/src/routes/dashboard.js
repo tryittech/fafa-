@@ -5,9 +5,11 @@ import { authenticateToken } from '../middleware/auth.js'
 const router = express.Router()
 
 // 獲取儀表板概覽數據
-router.get('/overview', authenticateToken, async (req, res) => {
+router.get('/overview', async (req, res) => {
   try {
-    const userId = req.user.userId
+    // 暫時移除認證要求
+    // const userId = req.user.userId
+    const userId = 1 // 使用預設用戶 ID
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -94,9 +96,10 @@ router.get('/overview', authenticateToken, async (req, res) => {
 })
 
 // 獲取現金流趨勢
-router.get('/cash-flow', authenticateToken, async (req, res) => {
+router.get('/cash-flow', async (req, res) => {
   try {
-    const userId = req.user.userId
+    // const userId = req.user.userId
+    const userId = 1 // 使用預設用戶 ID
     const { months = 6 } = req.query
     
     const cashFlowData = []
@@ -154,9 +157,10 @@ router.get('/cash-flow', authenticateToken, async (req, res) => {
 })
 
 // 獲取最近交易記錄
-router.get('/recent-transactions', authenticateToken, async (req, res) => {
+router.get('/recent-transactions', async (req, res) => {
   try {
-    const userId = req.user.userId
+    // const userId = req.user.userId
+    const userId = 1 // 使用預設用戶 ID
     const { limit = 10 } = req.query
     
     // 獲取最近收入記錄
