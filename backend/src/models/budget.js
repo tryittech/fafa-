@@ -198,10 +198,10 @@ class BudgetModel {
     let actualAmount = 0
     
     if (budget.category_name && budget.category_name !== '營業收入' && budget.category_name !== '其他收入') {
-      // 支出預算：從expenses表計算
+      // 支出預算：從expense表計算
       const expenseStmt = this.db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total
-        FROM expenses 
+        FROM expense 
         WHERE category = ? 
         AND strftime('%Y-%m', date) = ?
       `)
@@ -221,10 +221,10 @@ class BudgetModel {
       const result = expenseStmt.get(expenseCategory, period)
       actualAmount = result.total || 0
     } else {
-      // 收入預算：從incomes表計算
+      // 收入預算：從income表計算
       const incomeStmt = this.db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total
-        FROM incomes 
+        FROM income 
         WHERE strftime('%Y-%m', date) = ?
       `)
       

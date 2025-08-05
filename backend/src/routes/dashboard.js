@@ -1,11 +1,13 @@
 import express from 'express'
 import { query, get } from '../utils/database.js'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
 
 // 獲取儀表板概覽數據
-router.get('/overview', async (req, res) => {
+router.get('/overview', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -24,8 +26,8 @@ router.get('/overview', async (req, res) => {
         SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END) as pending_amount,
         SUM(CASE WHEN status = 'overdue' THEN total_amount ELSE 0 END) as overdue_amount
       FROM income 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     // 獲取支出統計
     const expenseStats = await get(`
@@ -38,8 +40,8 @@ router.get('/overview', async (req, res) => {
         SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END) as pending_amount,
         SUM(CASE WHEN status = 'overdue' THEN total_amount ELSE 0 END) as overdue_amount
       FROM expense 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     // 計算淨利
     const netIncome = (incomeStats.total_amount || 0) - (expenseStats.total_amount || 0)
@@ -92,8 +94,9 @@ router.get('/overview', async (req, res) => {
 })
 
 // 獲取現金流趨勢
-router.get('/cash-flow', async (req, res) => {
+router.get('/cash-flow', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { months = 6 } = req.query
     
     const cashFlowData = []
@@ -110,8 +113,8 @@ router.get('/cash-flow', async (req, res) => {
           SUM(amount) as income,
           SUM(CASE WHEN status = 'received' THEN total_amount ELSE 0 END) as received_income
         FROM income 
-        WHERE date BETWEEN ? AND ?
-      `, [startDate, endDate])
+        WHERE user_id = ? AND date BETWEEN ? AND ?
+      `, [userId, startDate, endDate])
       
       // 獲取該月支出
       const expenseResult = await get(`
@@ -119,8 +122,8 @@ router.get('/cash-flow', async (req, res) => {
           SUM(amount) as expense,
           SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_expense
         FROM expense 
-        WHERE date BETWEEN ? AND ?
-      `, [startDate, endDate])
+        WHERE user_id = ? AND date BETWEEN ? AND ?
+      `, [userId, startDate, endDate])
       
       const income = incomeResult.income || 0
       const expense = expenseResult.expense || 0
@@ -151,8 +154,9 @@ router.get('/cash-flow', async (req, res) => {
 })
 
 // 獲取最近交易記錄
-router.get('/recent-transactions', async (req, res) => {
+router.get('/recent-transactions', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { limit = 10 } = req.query
     
     // 獲取最近收入記錄
@@ -168,9 +172,10 @@ router.get('/recent-transactions', async (req, res) => {
         'income' as type,
         created_at
       FROM income 
+      WHERE user_id = ?
       ORDER BY date DESC, created_at DESC 
       LIMIT ?
-    `, [parseInt(limit)])
+    `, [userId, parseInt(limit)])
     
     // 獲取最近支出記錄
     const recentExpense = await query(`
@@ -185,9 +190,10 @@ router.get('/recent-transactions', async (req, res) => {
         'expense' as type,
         created_at
       FROM expense 
+      WHERE user_id = ?
       ORDER BY date DESC, created_at DESC 
       LIMIT ?
-    `, [parseInt(limit)])
+    `, [userId, parseInt(limit)])
     
     // 合併並排序
     const allTransactions = [...recentIncome, ...recentExpense]
@@ -208,8 +214,9 @@ router.get('/recent-transactions', async (req, res) => {
 })
 
 // 獲取收入支出分類統計
-router.get('/category-breakdown', async (req, res) => {
+router.get('/category-breakdown', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -224,10 +231,10 @@ router.get('/category-breakdown', async (req, res) => {
         COUNT(*) as count,
         SUM(amount) as total_amount
       FROM expense 
-      WHERE date BETWEEN ? AND ?
+      WHERE user_id = ? AND date BETWEEN ? AND ?
       GROUP BY category 
       ORDER BY total_amount DESC
-    `, [defaultStartDate, defaultEndDate])
+    `, [userId, defaultStartDate, defaultEndDate])
     
     // 獲取收入客戶統計
     const incomeCustomers = await query(`
@@ -236,11 +243,11 @@ router.get('/category-breakdown', async (req, res) => {
         COUNT(*) as count,
         SUM(amount) as total_amount
       FROM income 
-      WHERE date BETWEEN ? AND ?
+      WHERE user_id = ? AND date BETWEEN ? AND ?
       GROUP BY customer 
       ORDER BY total_amount DESC
       LIMIT 10
-    `, [defaultStartDate, defaultEndDate])
+    `, [userId, defaultStartDate, defaultEndDate])
     
     res.json({
       success: true,
@@ -263,8 +270,9 @@ router.get('/category-breakdown', async (req, res) => {
 })
 
 // 獲取財務健康指標
-router.get('/financial-health', async (req, res) => {
+router.get('/financial-health', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -279,8 +287,8 @@ router.get('/financial-health', async (req, res) => {
         SUM(CASE WHEN status = 'received' THEN total_amount ELSE 0 END) as received_income,
         COUNT(*) as income_count
       FROM income 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     const expenseResult = await get(`
       SELECT 
@@ -288,8 +296,8 @@ router.get('/financial-health', async (req, res) => {
         SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_expense,
         COUNT(*) as expense_count
       FROM expense 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     const totalIncome = incomeResult.total_income || 0
     const totalExpense = expenseResult.total_expense || 0

@@ -2,28 +2,30 @@ import express from 'express'
 import { query, run, get } from '../utils/database.js'
 import { body, validationResult } from 'express-validator'
 import { buildPaginatedQuery, buildCountQuery, buildStatsQuery, sanitizeParams } from '../utils/queryBuilder.js'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// 獲取所有收入記錄
-router.get('/', async (req, res) => {
+// 獲取收入記錄 (需要認證)
+router.get('/', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const filters = sanitizeParams(req.query, ['status', 'customer', 'startDate', 'endDate'])
     const pagination = { page: req.query.page || 1, limit: req.query.limit || 10 }
     
-    // 使用查詢建構器
+    // 使用查詢建構器，加入用戶過濾
     const { query: sql, params } = buildPaginatedQuery(
-      'SELECT * FROM income WHERE 1=1', 
-      [], 
+      'SELECT * FROM income WHERE user_id = ?', 
+      [userId], 
       filters, 
       pagination
     )
     
     const incomeRecords = await query(sql, params)
     
-    // 獲取總數
-    const { query: countSql, params: countParams } = buildCountQuery('income', filters)
-    const totalResult = await get(countSql, countParams)
+    // 獲取總數 (只計算當前用戶的記錄)
+    const countSql = 'SELECT COUNT(*) as total FROM income WHERE user_id = ?'
+    const totalResult = await get(countSql, [userId])
     const total = totalResult.total
     
     res.json({
@@ -45,12 +47,13 @@ router.get('/', async (req, res) => {
   }
 })
 
-// 獲取單一收入記錄
-router.get('/:id', async (req, res) => {
+// 獲取單一收入記錄 (需要認證)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.userId
     
-    const incomeRecord = await get('SELECT * FROM income WHERE id = ?', [id])
+    const incomeRecord = await get('SELECT * FROM income WHERE id = ? AND user_id = ?', [id, userId])
     
     if (!incomeRecord) {
       return res.status(404).json({
@@ -72,8 +75,8 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// 新增收入記錄
-router.post('/', [
+// 新增收入記錄 (需要認證)
+router.post('/', authenticateToken, [
   body('date').notEmpty().withMessage('日期為必填'),
   body('customer').notEmpty().withMessage('客戶名稱為必填'),
   body('description').notEmpty().withMessage('描述為必填'),
@@ -93,6 +96,7 @@ router.post('/', [
       })
     }
     
+    const userId = req.user.userId
     const {
       date,
       customer,
@@ -108,16 +112,16 @@ router.post('/', [
     const taxAmount = amount * (taxRate / 100)
     const totalAmount = amount + taxAmount
     
-    // 生成收入編號
-    const countResult = await get('SELECT COUNT(*) as count FROM income')
+    // 生成收入編號 (只計算當前用戶的記錄)
+    const countResult = await get('SELECT COUNT(*) as count FROM income WHERE user_id = ?', [userId])
     const incomeId = `INC${String(countResult.count + 1).padStart(3, '0')}`
     
     const result = await run(`
       INSERT INTO income (
-        income_id, date, customer, description, amount, tax_rate, 
+        income_id, user_id, date, customer, description, amount, tax_rate, 
         tax_amount, total_amount, status, payment_method, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [incomeId, date, customer, description, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, notes])
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [incomeId, userId, date, customer, description, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, notes])
     
     // 獲取新增的記錄
     const newRecord = await get('SELECT * FROM income WHERE id = ?', [result.id])
@@ -136,8 +140,8 @@ router.post('/', [
   }
 })
 
-// 更新收入記錄
-router.put('/:id', [
+// 更新收入記錄 (需要認證)
+router.put('/:id', authenticateToken, [
   body('date').notEmpty().withMessage('日期為必填'),
   body('customer').notEmpty().withMessage('客戶名稱為必填'),
   body('description').notEmpty().withMessage('描述為必填'),
@@ -158,6 +162,7 @@ router.put('/:id', [
     }
     
     const { id } = req.params
+    const userId = req.user.userId
     const {
       date,
       customer,
@@ -169,12 +174,12 @@ router.put('/:id', [
       notes
     } = req.body
     
-    // 檢查記錄是否存在
-    const existingRecord = await get('SELECT * FROM income WHERE id = ?', [id])
+    // 檢查記錄是否存在且屬於當前用戶
+    const existingRecord = await get('SELECT * FROM income WHERE id = ? AND user_id = ?', [id, userId])
     if (!existingRecord) {
       return res.status(404).json({
         success: false,
-        error: '找不到該收入記錄'
+        error: '找不到該收入記錄或您沒有權限修改'
       })
     }
     
@@ -187,8 +192,8 @@ router.put('/:id', [
         date = ?, customer = ?, description = ?, amount = ?, 
         tax_rate = ?, tax_amount = ?, total_amount = ?, 
         status = ?, payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [date, customer, description, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, notes, id])
+      WHERE id = ? AND user_id = ?
+    `, [date, customer, description, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, notes, id, userId])
     
     if (result.changes === 0) {
       return res.status(400).json({
@@ -214,21 +219,22 @@ router.put('/:id', [
   }
 })
 
-// 刪除收入記錄
-router.delete('/:id', async (req, res) => {
+// 刪除收入記錄 (需要認證)
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.userId
     
-    // 檢查記錄是否存在
-    const existingRecord = await get('SELECT * FROM income WHERE id = ?', [id])
+    // 檢查記錄是否存在且屬於當前用戶
+    const existingRecord = await get('SELECT * FROM income WHERE id = ? AND user_id = ?', [id, userId])
     if (!existingRecord) {
       return res.status(404).json({
         success: false,
-        error: '找不到該收入記錄'
+        error: '找不到該收入記錄或您沒有權限刪除'
       })
     }
     
-    const result = await run('DELETE FROM income WHERE id = ?', [id])
+    const result = await run('DELETE FROM income WHERE id = ? AND user_id = ?', [id, userId])
     
     if (result.changes === 0) {
       return res.status(400).json({

@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 const router = express.Router();
 import { query, run, get } from '../utils/database.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 /**
  * 獲取稅率資訊
@@ -53,7 +54,7 @@ router.get('/rates', async (req, res) => {
 /**
  * 計算營業稅
  */
-router.post('/calculate-business-tax', [
+router.post('/calculate-business-tax', authenticateToken, [
   body('monthlyRevenue').isFloat({ min: 0 }).withMessage('月營業額必須為正數'),
   body('exemptions').optional().isArray().withMessage('免稅項目必須為陣列'),
   body('deductions').optional().isArray().withMessage('扣除項目必須為陣列')
@@ -131,14 +132,17 @@ router.post('/calculate-business-tax', [
     };
     
     // 儲存計算記錄
+    const userId = req.user.userId;
     await run(`
       INSERT INTO tax_calculations (
+        user_id,
         calculation_type, 
         input_data, 
         result_data, 
         created_at
-      ) VALUES (?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?)
     `, [
+      userId,
       'business_tax',
       JSON.stringify(req.body),
       JSON.stringify(result),
@@ -164,7 +168,7 @@ router.post('/calculate-business-tax', [
 /**
  * 計算營利事業所得稅
  */
-router.post('/calculate-income-tax', [
+router.post('/calculate-income-tax', authenticateToken, [
   body('annualRevenue').isFloat({ min: 0 }).withMessage('年營業額必須為正數'),
   body('expenses').isArray().withMessage('費用項目必須為陣列'),
   body('depreciation').optional().isFloat({ min: 0 }).withMessage('折舊費用必須為正數')
@@ -213,14 +217,17 @@ router.post('/calculate-income-tax', [
     };
     
     // 儲存計算記錄
+    const userId = req.user.userId;
     await run(`
       INSERT INTO tax_calculations (
+        user_id,
         calculation_type, 
         input_data, 
         result_data, 
         created_at
-      ) VALUES (?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?)
     `, [
+      userId,
       'income_tax',
       JSON.stringify(req.body),
       JSON.stringify(result),
@@ -246,7 +253,7 @@ router.post('/calculate-income-tax', [
 /**
  * 獲取稅務申報提醒
  */
-router.get('/filing-reminders', async (req, res) => {
+router.get('/filing-reminders', authenticateToken, async (req, res) => {
   try {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
@@ -318,16 +325,17 @@ router.get('/filing-reminders', async (req, res) => {
 /**
  * 獲取稅務計算歷史記錄
  */
-router.get('/calculation-history', async (req, res) => {
+router.get('/calculation-history', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const { page = 1, limit = 10, type } = req.query;
     const offset = (page - 1) * limit;
     
-    let whereClause = '';
-    let params = [];
+    let whereClause = 'WHERE user_id = ?';
+    let params = [userId];
     
     if (type) {
-      whereClause = 'WHERE calculation_type = ?';
+      whereClause += ' AND calculation_type = ?';
       params.push(type);
     }
     

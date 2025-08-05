@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 // 路由
+import authRoutes from './routes/auth.js'
 import incomeRoutes from './routes/income.js'
 import expenseRoutes from './routes/expense.js'
 import dashboardRoutes from './routes/dashboard.js'
@@ -14,6 +15,9 @@ import reportsRoutes from './routes/reports.js'
 import taxRoutes from './routes/tax.js'
 import settingsRoutes from './routes/settings.js'
 import budgetRoutes from './routes/budget.js'
+import cashflowRoutes from './routes/cashflow.js'
+import analyticsRoutes from './routes/analytics.js'
+import assistantRoutes from './routes/assistant.js'
 
 // 資料庫初始化
 import { initDatabase } from './utils/database.js'
@@ -71,6 +75,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 // API 路由
+app.use('/api/auth', authRoutes)
 app.use('/api/income', incomeRoutes)
 app.use('/api/expense', expenseRoutes)
 app.use('/api/dashboard', dashboardRoutes)
@@ -78,6 +83,9 @@ app.use('/api/reports', reportsRoutes)
 app.use('/api/tax', taxRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/budget', budgetRoutes)
+app.use('/api/cashflow', cashflowRoutes)
+app.use('/api/analytics', analyticsRoutes)
+app.use('/api/assistant', assistantRoutes)
 
 // 健康檢查端點
 app.get('/api/health', (req, res) => {
@@ -101,7 +109,11 @@ app.get('/', (req, res) => {
       dashboard: '/api/dashboard',
       reports: '/api/reports',
       tax: '/api/tax',
-      settings: '/api/settings'
+      settings: '/api/settings',
+      budget: '/api/budget',
+      cashflow: '/api/cashflow',
+      analytics: '/api/analytics',
+      assistant: '/api/assistant'
     }
   })
 })

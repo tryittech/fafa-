@@ -19,8 +19,9 @@ import {
   Alert,
   Divider
 } from 'antd'
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, MailOutlined, WarningOutlined, DollarOutlined, UserOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, MailOutlined, WarningOutlined, DollarOutlined, UserOutlined, InfoCircleOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { incomeAPI, assistantAPI } from '../services/api'
 
 
 const { Option } = Select
@@ -32,71 +33,15 @@ const IncomeManagement = () => {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form] = Form.useForm()
 
-  const [incomeData, setIncomeData] = useState([
-    {
-      key: '1',
-      id: 'INC001',
-      date: '2024-01-15',
-      customer: 'A公司',
-      description: '網站開發專案',
-      amount: 50000,
-      taxRate: 5,
-      taxAmount: 2500,
-      totalAmount: 52500,
-      status: 'received',
-      paymentMethod: 'bank_transfer',
-      notes: '第一期款項',
-      dueDate: '2024-01-30',
-    },
-    {
-      key: '2',
-      id: 'INC002',
-      date: '2024-01-10',
-      customer: 'B公司',
-      description: '行銷顧問服務',
-      amount: 30000,
-      taxRate: 5,
-      taxAmount: 1500,
-      totalAmount: 31500,
-      status: 'pending',
-      paymentMethod: 'check',
-      notes: '月費服務',
-      dueDate: '2024-02-10',
-    },
-    {
-      key: '3',
-      id: 'INC003',
-      date: '2024-01-05',
-      customer: 'C公司',
-      description: '系統維護合約',
-      amount: 15000,
-      taxRate: 5,
-      taxAmount: 750,
-      totalAmount: 15750,
-      status: 'overdue',
-      paymentMethod: 'cash',
-      notes: '年度維護費',
-      dueDate: '2024-01-20',
-    },
-    {
-      key: '4',
-      id: 'INC004',
-      date: '2024-01-20',
-      customer: 'A公司',
-      description: '第二期開發款',
-      amount: 35000,
-      taxRate: 5,
-      taxAmount: 1750,
-      totalAmount: 36750,
-      status: 'pending',
-      paymentMethod: 'bank_transfer',
-      notes: '第二期款項',
-      dueDate: '2024-02-20',
-    },
-  ])
+  const [incomeData, setIncomeData] = useState([])
+  const [selectedRowKeys, setSelectedRowKeys] = useState([])
+  const [batchModalVisible, setBatchModalVisible] = useState(false)
+  const [batchOperation, setBatchOperation] = useState('')
+  const [smartSuggestion, setSmartSuggestion] = useState(null)
+  const [isGettingSuggestion, setIsGettingSuggestion] = useState(false)
 
   const statusOptions = [
-    { value: 'received', label: '已收款', color: 'green' },
+    { value: 'paid', label: '已收款', color: 'green' },
     { value: 'pending', label: '待收款', color: 'orange' },
     { value: 'overdue', label: '逾期', color: 'red' },
   ]
@@ -107,6 +52,43 @@ const IncomeManagement = () => {
     { value: 'cash', label: '現金' },
     { value: 'credit_card', label: '信用卡' },
   ]
+
+  // 載入收入數據
+  const loadIncomeData = async () => {
+    try {
+      setLoading(true)
+      const response = await incomeAPI.getList()
+      if (response.success) {
+        // 格式化數據以匹配表格需要的格式
+        const formattedData = (response.data || []).map((item, index) => ({
+          key: item.income_id || index,
+          id: item.income_id,
+          date: item.date,
+          customer: item.customer,
+          description: item.description,
+          amount: item.amount,
+          taxRate: item.tax_rate,
+          taxAmount: item.tax_amount,
+          totalAmount: item.total_amount,
+          status: item.status,
+          paymentMethod: item.payment_method,
+          notes: item.notes,
+          dueDate: item.date, // 使用收入日期作為到期日
+        }))
+        setIncomeData(formattedData)
+      }
+    } catch (error) {
+      console.error('載入收入數據失敗:', error)
+      message.error('載入收入數據失敗，請稍後重試')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 組件載入時獲取數據
+  useEffect(() => {
+    loadIncomeData()
+  }, [])
 
   // 計算收入洞察數據
   const calculateIncomeInsights = () => {
@@ -346,7 +328,8 @@ const IncomeManagement = () => {
     form.setFieldsValue({
       ...record,
       date: dayjs(record.date),
-      dueDate: record.dueDate ? dayjs(record.dueDate) : null,
+      taxRate: record.taxRate,
+      paymentMethod: record.paymentMethod,
     })
     setModalVisible(true)
   }
@@ -355,11 +338,105 @@ const IncomeManagement = () => {
     Modal.confirm({
       title: '確認刪除',
       content: `確定要刪除收入記錄 "${record.description}" 嗎？`,
-      onOk: () => {
-        setIncomeData(prev => prev.filter(item => item.key !== record.key))
-        message.success('收入記錄已刪除')
+      onOk: async () => {
+        try {
+          const response = await incomeAPI.delete(record.id)
+          if (response.success) {
+            message.success('收入記錄已刪除')
+            loadIncomeData() // 重新載入數據
+          }
+        } catch (error) {
+          console.error('刪除失敗:', error)
+          message.error('刪除失敗，請重試')
+        }
       },
     })
+  }
+
+  // 批量操作處理函數
+  const handleBatchOperation = (operation) => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('請選擇要操作的項目')
+      return
+    }
+    setBatchOperation(operation)
+    setBatchModalVisible(true)
+  }
+
+  const confirmBatchOperation = async (values) => {
+    setLoading(true)
+    try {
+      const promises = selectedRowKeys.map(async (id) => {
+        switch (batchOperation) {
+          case 'updateStatus':
+            return incomeAPI.update(id, { status: values.status })
+          case 'delete':
+            return incomeAPI.delete(id)
+          default:
+            return Promise.resolve()
+        }
+      })
+
+      await Promise.all(promises)
+      
+      message.success(`批量${batchOperation === 'delete' ? '刪除' : '更新'}成功！`)
+      setSelectedRowKeys([])
+      setBatchModalVisible(false)
+      loadIncomeData()
+    } catch (error) {
+      console.error('批量操作失敗:', error)
+      message.error('批量操作失敗，請重試')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: setSelectedRowKeys,
+    getCheckboxProps: (record) => ({
+      disabled: false,
+    }),
+  }
+
+  // 智能分類建議
+  const getSmartSuggestion = async (description, amount) => {
+    if (!description || !amount) return
+    
+    setIsGettingSuggestion(true)
+    try {
+      const response = await assistantAPI.classifyTransaction({
+        description,
+        amount,
+        type: 'income'
+      })
+      if (response.success) {
+        setSmartSuggestion(response.data)
+      }
+    } catch (error) {
+      console.error('獲取智能建議失敗:', error)
+    } finally {
+      setIsGettingSuggestion(false)
+    }
+  }
+
+  // 當描述或金額改變時觸發智能建議
+  const handleFormChange = (changedFields, allFields) => {
+    const description = allFields.find(f => f.name[0] === 'description')?.value
+    const amount = allFields.find(f => f.name[0] === 'amount')?.value
+    
+    if (description && amount && description.length > 2) {
+      // 延遲執行，避免過於頻繁的API調用
+      setTimeout(() => {
+        getSmartSuggestion(description, amount)
+      }, 1000)
+    }
+  }
+
+  // 應用智能建議
+  const applySuggestion = (category) => {
+    form.setFieldsValue({ category })
+    setSmartSuggestion(null)
   }
 
   const handleSubmit = async (values) => {
@@ -367,37 +444,39 @@ const IncomeManagement = () => {
       setLoading(true)
       
       const formData = {
-        ...values,
         date: values.date.format('YYYY-MM-DD'),
-        dueDate: values.dueDate.format('YYYY-MM-DD'),
-        taxAmount: values.amount * (values.taxRate / 100),
-        totalAmount: values.amount * (1 + values.taxRate / 100),
+        customer: values.customer,
+        description: values.description,
+        category: values.category,
+        amount: values.amount,
+        tax_rate: values.taxRate,
+        tax_amount: values.amount * (values.taxRate / 100),
+        total_amount: values.amount * (1 + values.taxRate / 100),
+        status: values.status,
+        payment_method: values.paymentMethod,
+        notes: values.notes || '',
       }
 
       if (editingRecord) {
         // 更新現有記錄
-        setIncomeData(prev => 
-          prev.map(item => 
-            item.key === editingRecord.key 
-              ? { ...item, ...formData, key: item.key }
-              : item
-          )
-        )
-        message.success('收入記錄已更新')
+        const response = await incomeAPI.update(editingRecord.id, formData)
+        if (response.success) {
+          message.success('收入記錄已更新')
+          loadIncomeData() // 重新載入數據
+        }
       } else {
         // 新增記錄
-        const newRecord = {
-          ...formData,
-          key: Date.now().toString(),
-          id: `INC${String(incomeData.length + 1).padStart(3, '0')}`,
+        const response = await incomeAPI.create(formData)
+        if (response.success) {
+          message.success('收入記錄已新增')
+          loadIncomeData() // 重新載入數據
         }
-        setIncomeData(prev => [newRecord, ...prev])
-        message.success('收入記錄已新增')
       }
 
       setModalVisible(false)
       form.resetFields()
     } catch (error) {
+      console.error('操作失敗:', error)
       message.error('操作失敗，請重試')
     } finally {
       setLoading(false)
@@ -566,6 +645,40 @@ const IncomeManagement = () => {
             進階搜尋
           </Button>
         </Space>
+        
+        {/* 批量操作工具欄 */}
+        {selectedRowKeys.length > 0 && (
+          <div style={{ 
+            marginTop: 16, 
+            padding: '12px 16px', 
+            background: '#f0f2f5', 
+            borderRadius: 6,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>已選擇 {selectedRowKeys.length} 項</span>
+            <Space>
+              <Button 
+                type="primary" 
+                icon={<CheckOutlined />}
+                onClick={() => handleBatchOperation('updateStatus')}
+              >
+                批量更新狀態
+              </Button>
+              <Button 
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleBatchOperation('delete')}
+              >
+                批量刪除
+              </Button>
+              <Button onClick={() => setSelectedRowKeys([])}>
+                取消選擇
+              </Button>
+            </Space>
+          </div>
+        )}
       </Card>
 
       {/* 收入列表 */}
@@ -574,6 +687,7 @@ const IncomeManagement = () => {
           columns={columns}
           dataSource={incomeData}
           loading={loading}
+          rowSelection={rowSelection}
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
@@ -596,6 +710,7 @@ const IncomeManagement = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onFieldsChange={handleFormChange}
           initialValues={{
             taxRate: 5,
             status: 'pending',
@@ -603,7 +718,7 @@ const IncomeManagement = () => {
           }}
         >
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="date"
                 label="收入日期"
@@ -612,22 +727,13 @@ const IncomeManagement = () => {
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="customer"
                 label="客戶名稱"
                 rules={[{ required: true, message: '請輸入客戶名稱' }]}
               >
                 <Input placeholder="請輸入客戶名稱" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="dueDate"
-                label="付款日期"
-                rules={[{ required: true, message: '請選擇付款日期' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
@@ -673,6 +779,88 @@ const IncomeManagement = () => {
               </Form.Item>
             </Col>
           </Row>
+
+          {/* 智能分類建議 */}
+          {smartSuggestion && (
+            <Alert
+              message="💡 AI 智能分類建議"
+              description={
+                <div>
+                  <div style={{ marginBottom: 8 }}>
+                    建議分類：
+                    <Tag 
+                      color="blue" 
+                      style={{ marginLeft: 8, cursor: 'pointer' }}
+                      onClick={() => applySuggestion(smartSuggestion.suggestedCategory)}
+                    >
+                      {smartSuggestion.suggestedCategory}
+                    </Tag>
+                    <span style={{ marginLeft: 8, fontSize: '12px', color: '#666' }}>
+                      信心度: {Math.round(smartSuggestion.confidence * 100)}%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {smartSuggestion.explanation}
+                  </div>
+                  {smartSuggestion.alternatives && smartSuggestion.alternatives.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      其他選項：
+                      {smartSuggestion.alternatives.map((alt, index) => (
+                        <Tag 
+                          key={index} 
+                          style={{ margin: '2px', cursor: 'pointer' }}
+                          onClick={() => applySuggestion(alt)}
+                        >
+                          {alt}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              }
+              type="info"
+              showIcon
+              closable
+              onClose={() => setSmartSuggestion(null)}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          {/* 分類欄位 */}
+          <Form.Item
+            name="category"
+            label={
+              <span>
+                收入分類
+                {isGettingSuggestion && (
+                  <span style={{ marginLeft: 8, color: '#1890ff' }}>
+                    <span className="ant-spin-dot ant-spin-dot-small ant-spin-dot-spin">
+                      <i className="ant-spin-dot-item"></i>
+                      <i className="ant-spin-dot-item"></i>
+                      <i className="ant-spin-dot-item"></i>
+                      <i className="ant-spin-dot-item"></i>
+                    </span>
+                    AI 分析中...
+                  </span>
+                )}
+              </span>
+            }
+            rules={[{ required: true, message: '請選擇或輸入收入分類' }]}
+          >
+            <Select 
+              placeholder="請選擇收入分類" 
+              showSearch
+              allowClear
+              optionFilterProp="children"
+            >
+              <Option value="銷售">銷售收入</Option>
+              <Option value="服務">服務收入</Option>
+              <Option value="諮詢">諮詢收入</Option>
+              <Option value="租金">租金收入</Option>
+              <Option value="利息">利息收入</Option>
+              <Option value="其他">其他收入</Option>
+            </Select>
+          </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
@@ -725,6 +913,70 @@ const IncomeManagement = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 批量操作模態框 */}
+      <Modal
+        title={`批量操作 (${selectedRowKeys.length} 項)`}
+        open={batchModalVisible}
+        onCancel={() => setBatchModalVisible(false)}
+        footer={null}
+        width={400}
+      >
+        {batchOperation === 'updateStatus' && (
+          <Form
+            layout="vertical"
+            onFinish={confirmBatchOperation}
+          >
+            <Form.Item
+              name="status"
+              label="更新狀態"
+              rules={[{ required: true, message: '請選擇狀態' }]}
+            >
+              <Select placeholder="請選擇新狀態">
+                {statusOptions.map(option => (
+                  <Option key={option.value} value={option.value}>
+                    <Tag color={option.color}>{option.label}</Tag>
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit" loading={loading}>
+                  確認更新
+                </Button>
+                <Button onClick={() => setBatchModalVisible(false)}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        )}
+
+        {batchOperation === 'delete' && (
+          <div>
+            <Alert
+              message="警告"
+              description={`確定要刪除選中的 ${selectedRowKeys.length} 項收入記錄嗎？此操作無法復原。`}
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+            <Space>
+              <Button 
+                danger 
+                onClick={() => confirmBatchOperation({})}
+                loading={loading}
+              >
+                確認刪除
+              </Button>
+              <Button onClick={() => setBatchModalVisible(false)}>
+                取消
+              </Button>
+            </Space>
+          </div>
+        )}
       </Modal>
     </div>
   )

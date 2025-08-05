@@ -34,6 +34,40 @@ const ExpenseManagement = () => {
   const [expenseTrend, setExpenseTrend] = useState(null)
   const [trendLoading, setTrendLoading] = useState(false)
 
+  const [expenseData, setExpenseData] = useState([])
+
+  // 載入支出數據
+  const loadExpenseData = async () => {
+    try {
+      setLoading(true)
+      const response = await expenseAPI.getList()
+      if (response.success) {
+        // 格式化數據以匹配表格需要的格式
+        const formattedData = (response.data || []).map((item, index) => ({
+          key: item.expense_id || index,
+          id: item.expense_id,
+          date: item.date,
+          vendor: item.vendor,
+          description: item.description,
+          category: item.category,
+          amount: item.amount,
+          taxRate: item.tax_rate,
+          taxAmount: item.tax_amount,
+          totalAmount: item.total_amount,
+          status: item.status,
+          paymentMethod: item.payment_method,
+          notes: item.notes,
+        }))
+        setExpenseData(formattedData)
+      }
+    } catch (error) {
+      console.error('載入支出數據失敗:', error)
+      message.error('載入支出數據失敗，請稍後重試')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // 獲取支出趨勢洞察
   const fetchExpenseTrend = async () => {
     try {
@@ -48,58 +82,11 @@ const ExpenseManagement = () => {
     }
   }
 
-  // 頁面載入時獲取趨勢數據
+  // 頁面載入時獲取數據
   useEffect(() => {
+    loadExpenseData()
     fetchExpenseTrend()
   }, [])
-
-  const [expenseData, setExpenseData] = useState([
-    {
-      key: '1',
-      id: 'EXP001',
-      date: '2024-01-15',
-      vendor: '房東',
-      description: '辦公室租金',
-      category: 'rent',
-      amount: 15000,
-      taxRate: 5,
-      taxAmount: 750,
-      totalAmount: 15750,
-      status: 'paid',
-      paymentMethod: 'bank_transfer',
-      notes: '1月份租金',
-    },
-    {
-      key: '2',
-      id: 'EXP002',
-      date: '2024-01-14',
-      vendor: '員工A',
-      description: '員工薪資',
-      category: 'salary',
-      amount: 80000,
-      taxRate: 0,
-      taxAmount: 0,
-      totalAmount: 80000,
-      status: 'paid',
-      paymentMethod: 'bank_transfer',
-      notes: '1月份薪資',
-    },
-    {
-      key: '3',
-      id: 'EXP003',
-      date: '2024-01-10',
-      vendor: '網路公司',
-      description: '網路費用',
-      category: 'utilities',
-      amount: 2000,
-      taxRate: 5,
-      taxAmount: 100,
-      totalAmount: 2100,
-      status: 'pending',
-      paymentMethod: 'credit_card',
-      notes: '網路月費',
-    },
-  ])
 
   const expenseCategories = [
     { value: 'rent', label: '租金', color: 'blue' },
@@ -248,6 +235,9 @@ const ExpenseManagement = () => {
     form.setFieldsValue({
       ...record,
       date: dayjs(record.date),
+      taxRate: record.taxRate,
+      paymentMethod: record.paymentMethod,
+      category: record.category,
     })
     setModalVisible(true)
   }
@@ -256,9 +246,17 @@ const ExpenseManagement = () => {
     Modal.confirm({
       title: '確認刪除',
       content: `確定要刪除支出記錄 "${record.description}" 嗎？`,
-      onOk: () => {
-        setExpenseData(prev => prev.filter(item => item.key !== record.key))
-        message.success('支出記錄已刪除')
+      onOk: async () => {
+        try {
+          const response = await expenseAPI.delete(record.id)
+          if (response.success) {
+            message.success('支出記錄已刪除')
+            loadExpenseData() // 重新載入數據
+          }
+        } catch (error) {
+          console.error('刪除失敗:', error)
+          message.error('刪除失敗，請重試')
+        }
       },
     })
   }
@@ -268,36 +266,39 @@ const ExpenseManagement = () => {
       setLoading(true)
       
       const formData = {
-        ...values,
         date: values.date.format('YYYY-MM-DD'),
-        taxAmount: values.amount * (values.taxRate / 100),
-        totalAmount: values.amount * (1 + values.taxRate / 100),
+        vendor: values.vendor,
+        description: values.description,
+        category: values.category,
+        amount: values.amount,
+        tax_rate: values.taxRate,
+        tax_amount: values.amount * (values.taxRate / 100),
+        total_amount: values.amount * (1 + values.taxRate / 100),
+        status: values.status,
+        payment_method: values.paymentMethod,
+        notes: values.notes || '',
       }
 
       if (editingRecord) {
         // 更新現有記錄
-        setExpenseData(prev => 
-          prev.map(item => 
-            item.key === editingRecord.key 
-              ? { ...item, ...formData, key: item.key }
-              : item
-          )
-        )
-        message.success('支出記錄已更新')
+        const response = await expenseAPI.update(editingRecord.id, formData)
+        if (response.success) {
+          message.success('支出記錄已更新')
+          loadExpenseData() // 重新載入數據
+        }
       } else {
         // 新增記錄
-        const newRecord = {
-          ...formData,
-          key: Date.now().toString(),
-          id: `EXP${String(expenseData.length + 1).padStart(3, '0')}`,
+        const response = await expenseAPI.create(formData)
+        if (response.success) {
+          message.success('支出記錄已新增')
+          loadExpenseData() // 重新載入數據
         }
-        setExpenseData(prev => [newRecord, ...prev])
-        message.success('支出記錄已新增')
       }
 
       setModalVisible(false)
       form.resetFields()
     } catch (error) {
+      console.error('操作失敗:', error)
       message.error('操作失敗，請重試')
     } finally {
       setLoading(false)

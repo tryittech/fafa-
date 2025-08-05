@@ -947,7 +947,7 @@ const FinancialReports = () => {
                       title={
                         <span>
                           負債比率
-                          <AntTooltip title="總負債 ÷ 總資產 × 100%。理想範圍：<50%">
+                                                     <AntTooltip title="總負債 ÷ 總資產 × 100%。理想範圍：&lt;50%">
                             <InfoCircleOutlined style={{ marginLeft: 4, color: '#1890ff' }} />
                           </AntTooltip>
                         </span>

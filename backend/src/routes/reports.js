@@ -1,11 +1,13 @@
 import express from 'express'
 import { query, get } from '../utils/database.js'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
 
 // 獲取損益表
-router.get('/income-statement', async (req, res) => {
+router.get('/income-statement', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -19,8 +21,8 @@ router.get('/income-statement', async (req, res) => {
         SUM(amount) as revenue,
         SUM(tax_amount) as revenue_tax
       FROM income 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     // 獲取支出數據
     const expenseResult = await get(`
@@ -28,8 +30,8 @@ router.get('/income-statement', async (req, res) => {
         SUM(amount) as total_expenses,
         SUM(tax_amount) as expense_tax
       FROM expense 
-      WHERE date BETWEEN ? AND ?
-    `, [defaultStartDate, defaultEndDate])
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+    `, [userId, defaultStartDate, defaultEndDate])
     
     const revenue = incomeResult.revenue || 0
     const totalExpenses = expenseResult.total_expenses || 0
@@ -67,8 +69,9 @@ router.get('/income-statement', async (req, res) => {
 })
 
 // 獲取支出分類明細
-router.get('/expense-breakdown', async (req, res) => {
+router.get('/expense-breakdown', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     // 設定預設日期範圍（當前月份）
@@ -84,10 +87,10 @@ router.get('/expense-breakdown', async (req, res) => {
         SUM(tax_amount) as tax_amount,
         SUM(total_amount) as total_amount
       FROM expense 
-      WHERE date BETWEEN ? AND ?
+      WHERE user_id = ? AND date BETWEEN ? AND ?
       GROUP BY category 
       ORDER BY amount DESC
-    `, [defaultStartDate, defaultEndDate])
+    `, [userId, defaultStartDate, defaultEndDate])
     
     res.json({
       success: true,

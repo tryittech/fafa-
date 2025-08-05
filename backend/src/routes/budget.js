@@ -1,12 +1,13 @@
 import express from 'express'
 import BudgetModel from '../models/budget.js'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
-const budgetModel = new BudgetModel()
 
 // 獲取預算分類
-router.get('/categories', (req, res) => {
+router.get('/categories', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const categories = budgetModel.getCategories()
     res.json({
       success: true,
@@ -23,8 +24,9 @@ router.get('/categories', (req, res) => {
 })
 
 // 獲取預算列表
-router.get('/', (req, res) => {
+router.get('/', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { period, budget_type, category } = req.query
     const filters = {}
     
@@ -49,8 +51,9 @@ router.get('/', (req, res) => {
 })
 
 // 獲取預算概覽
-router.get('/overview/:period', (req, res) => {
+router.get('/overview/:period', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { period } = req.params
     
     // 更新所有預算執行狀況
@@ -74,8 +77,9 @@ router.get('/overview/:period', (req, res) => {
 })
 
 // 獲取單個預算
-router.get('/:id', (req, res) => {
+router.get('/:id', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { id } = req.params
     const budget = budgetModel.getBudget(id)
     
@@ -107,7 +111,7 @@ router.get('/:id', (req, res) => {
 })
 
 // 創建新預算
-router.post('/', (req, res) => {
+router.post('/', authenticateToken, (req, res) => {
   try {
     const { name, category, budget_type, amount, period, description } = req.body
     
@@ -136,6 +140,7 @@ router.post('/', (req, res) => {
       description: description || ''
     }
     
+    const budgetModel = new BudgetModel(req.user.userId)
     const budget = budgetModel.createBudget(budgetData)
     
     res.status(201).json({
@@ -154,8 +159,9 @@ router.post('/', (req, res) => {
 })
 
 // 更新預算
-router.put('/:id', (req, res) => {
+router.put('/:id', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { id } = req.params
     const { name, category, budget_type, amount, period, description } = req.body
     
@@ -214,8 +220,9 @@ router.put('/:id', (req, res) => {
 })
 
 // 刪除預算
-router.delete('/:id', (req, res) => {
+router.delete('/:id', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { id } = req.params
     
     // 檢查預算是否存在
@@ -244,8 +251,9 @@ router.delete('/:id', (req, res) => {
 })
 
 // 手動更新預算執行狀況
-router.post('/:id/update-execution', (req, res) => {
+router.post('/:id/update-execution', authenticateToken, (req, res) => {
   try {
+    const budgetModel = new BudgetModel(req.user.userId)
     const { id } = req.params
     const { period } = req.body
     

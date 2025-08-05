@@ -26,20 +26,318 @@ body {
   --error-color: #f5222d;
   --font-size-base: 14px;
   --border-radius-base: 6px;
+  --mobile-breakpoint: 768px;
+  --tablet-breakpoint: 1024px;
 }
 
-/* 響應式設計 */
+/* =================================
+   移動端響應式設計核心樣式
+   ================================= */
+
+/* 基礎響應式斷點 */
+@media (max-width: 480px) {
+  /* 超小屏手機 */
+  :root {
+    --font-size-base: 12px;
+  }
+}
+
 @media (max-width: 768px) {
+  /* 手機端 */
+  
+  /* 側邊欄移動端適配 */
   .ant-layout-sider {
     position: fixed !important;
     height: 100vh;
-    z-index: 999;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .ant-layout-sider.ant-layout-sider-collapsed {
+    transform: translateX(-80px);
+  }
+  
+  .ant-layout-sider:not(.ant-layout-sider-collapsed) {
+    transform: translateX(0);
+  }
+  
+  /* 主內容區域適配 */
+  .ant-layout {
+    margin-left: 0 !important;
   }
   
   .ant-layout-content {
-    margin-left: 0 !important;
+    margin: 16px 8px !important;
+    padding: 16px !important;
+  }
+  
+  /* Header 適配 */
+  .ant-layout-header {
+    padding: 0 16px !important;
+  }
+  
+  .ant-layout-header h2 {
+    font-size: 16px !important;
+    display: none; /* 隱藏標題以節省空間 */
+  }
+  
+  /* 遮罩層 */
+  .mobile-sider-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+    display: none;
+  }
+  
+  .mobile-sider-mask.active {
+    display: block;
   }
 }
+
+@media (max-width: 1024px) {
+  /* 平板端 */
+  .ant-layout-content {
+    margin: 20px 12px !important;
+    padding: 20px !important;
+  }
+}
+
+/* =================================
+   表格響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  /* 表格移動端優化 */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+  
+  .ant-table {
+    min-width: 600px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 8px !important;
+    font-size: 12px;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 8px !important;
+    font-size: 12px;
+  }
+  
+  /* 隱藏非關鍵列 */
+  .ant-table .mobile-hidden {
+    display: none !important;
+  }
+  
+  /* 表格操作按鈕組優化 */
+  .ant-table .ant-btn-group {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .ant-table .ant-btn-group .ant-btn {
+    font-size: 11px;
+    padding: 2px 8px;
+    height: auto;
+  }
+}
+
+/* =================================
+   卡片響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .ant-card {
+    margin-bottom: 12px;
+  }
+  
+  .ant-card-head {
+    padding: 12px 16px !important;
+    min-height: auto !important;
+  }
+  
+  .ant-card-head-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  .ant-card-body {
+    padding: 16px !important;
+  }
+  
+  .ant-card-actions {
+    padding: 8px 16px;
+  }
+  
+  .ant-card-actions > li {
+    margin: 4px 0;
+  }
+}
+
+/* =================================
+   表單響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .ant-form-item {
+    margin-bottom: 16px;
+  }
+  
+  .ant-form-item-label {
+    padding-bottom: 4px;
+  }
+  
+  .ant-form-item-label > label {
+    font-size: 13px;
+  }
+  
+  .ant-input, 
+  .ant-select-selector,
+  .ant-picker {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  
+  .ant-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    height: auto;
+  }
+  
+  .ant-btn-lg {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  
+  /* 表單按鈕組 */
+  .ant-form-item .ant-btn-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .ant-form-item .ant-btn-group .ant-btn {
+    width: 100%;
+  }
+}
+
+/* =================================
+   統計組件響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .ant-statistic {
+    text-align: center;
+  }
+  
+  .ant-statistic-title {
+    font-size: 12px !important;
+    margin-bottom: 4px;
+  }
+  
+  .ant-statistic-content {
+    font-size: 18px !important;
+  }
+  
+  .ant-statistic-content-value {
+    font-size: 18px !important;
+  }
+  
+  .ant-statistic-content-prefix,
+  .ant-statistic-content-suffix {
+    font-size: 14px !important;
+  }
+}
+
+/* =================================
+   圖表響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .recharts-wrapper {
+    font-size: 11px;
+  }
+  
+  .recharts-legend-wrapper {
+    font-size: 10px !important;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    font-size: 10px !important;
+  }
+  
+  .recharts-tooltip-wrapper {
+    font-size: 11px !important;
+  }
+}
+
+/* =================================
+   模態框響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .ant-modal {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px !important;
+  }
+  
+  .ant-modal-content {
+    border-radius: 8px;
+  }
+  
+  .ant-modal-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .ant-modal-body {
+    padding: 16px 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  
+  .ant-modal-footer {
+    padding: 12px 20px 16px;
+    text-align: center;
+  }
+  
+  .ant-modal-footer .ant-btn {
+    margin: 0 4px;
+    width: auto;
+    min-width: 80px;
+  }
+}
+
+/* =================================
+   抽屜組件響應式設計
+   ================================= */
+
+@media (max-width: 768px) {
+  .ant-drawer-content-wrapper {
+    width: 100vw !important;
+  }
+  
+  .ant-drawer-header {
+    padding: 16px 20px;
+  }
+  
+  .ant-drawer-body {
+    padding: 16px 20px;
+  }
+}
+
+/* =================================
+   自定義樣式
+   ================================= */
 
 /* 自定義滾動條 */
 ::-webkit-scrollbar {
@@ -65,11 +363,11 @@ body {
 .ant-card {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
 }
 
 .ant-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: box-shadow 0.3s ease;
 }
 
 /* 表格樣式優化 */
@@ -81,12 +379,18 @@ body {
 .ant-table-thead > tr > th {
   background-color: #fafafa;
   font-weight: 600;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #f5f5f5;
 }
 
 /* 按鈕樣式優化 */
 .ant-btn {
   border-radius: 6px;
   font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .ant-btn-primary {
@@ -96,6 +400,8 @@ body {
 
 .ant-btn-primary:hover {
   background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
 }
 
 /* 表單樣式優化 */
@@ -106,6 +412,11 @@ body {
 
 .ant-input, .ant-select-selector {
   border-radius: 6px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ant-input:focus, .ant-select-selector:focus {
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
 
 /* 統計卡片樣式 */
@@ -115,27 +426,136 @@ body {
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4);
 }
 
 .stat-card.income {
   background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  box-shadow: 0 4px 20px rgba(82, 196, 26, 0.3);
+}
+
+.stat-card.income:hover {
+  box-shadow: 0 8px 30px rgba(82, 196, 26, 0.4);
 }
 
 .stat-card.expense {
   background: linear-gradient(135deg, #f5222d 0%, #cf1322 100%);
+  box-shadow: 0 4px 20px rgba(245, 34, 45, 0.3);
+}
+
+.stat-card.expense:hover {
+  box-shadow: 0 8px 30px rgba(245, 34, 45, 0.4);
 }
 
 .stat-card.balance {
   background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  box-shadow: 0 4px 20px rgba(24, 144, 255, 0.3);
+}
+
+.stat-card.balance:hover {
+  box-shadow: 0 8px 30px rgba(24, 144, 255, 0.4);
 }
 
 /* 圖表容器樣式 */
 .chart-container {
-  background: white;
-  border-radius: 8px;
+  background: white !important;
+  border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 16px;
+  transition: box-shadow 0.3s ease;
+}
+
+.chart-container:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* 強制圖表背景為白色 - 最高優先級 */
+.recharts-wrapper,
+.recharts-wrapper * {
+  background: white !important;
+  background-color: white !important;
+}
+
+.recharts-surface,
+.recharts-surface * {
+  background: white !important;
+  background-color: white !important;
+  fill: white !important;
+}
+
+/* 確保圖表內部組件背景正確 */
+.recharts-cartesian-grid-bg {
+  fill: white !important;
+  background: white !important;
+}
+
+/* 強制所有圖表相關背景為白色 */
+.recharts-responsive-container,
+.recharts-responsive-container * {
+  background: white !important;
+  background-color: white !important;
+}
+
+.recharts-layer {
+  background: white !important;
+  background-color: white !important;
+}
+
+/* SVG 背景強制白色 */
+svg.recharts-surface,
+svg.recharts-surface * {
+  background-color: white !important;
+  background: white !important;
+}
+
+/* 圖表網格背景 */
+.recharts-cartesian-grid,
+.recharts-cartesian-grid * {
+  background: white !important;
+  background-color: white !important;
+}
+
+.recharts-cartesian-grid rect {
+  fill: white !important;
+  background: white !important;
+}
+
+/* 覆蓋任何可能的深色主題影響 */
+.ant-layout .recharts-wrapper,
+.ant-layout .recharts-surface,
+.ant-layout svg.recharts-surface {
+  background: white !important;
+  background-color: white !important;
+  fill: white !important;
+}
+
+/* 圖表容器強制背景 */
+.chart-container .recharts-wrapper,
+.chart-container .recharts-surface,
+.chart-container svg {
+  background: white !important;
+  background-color: white !important;
+}
+
+/* 處理可能的繼承樣式問題 */
+[class*="recharts"] {
+  background: white !important;
+  background-color: white !important;
+}
+
+/* 特別針對可能出現的黑色背景 */
+.recharts-wrapper[style*="black"],
+.recharts-surface[style*="black"],
+svg[style*="black"] {
+  background: white !important;
+  background-color: white !important;
 }
 
 /* 響應式網格 */
@@ -148,5 +568,359 @@ body {
 @media (max-width: 768px) {
   .responsive-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
-} 
+}
+
+/* 移動端優化類 */
+.mobile-optimized {
+  padding: 16px 12px !important;
+}
+
+.mobile-hidden {
+  display: none !important;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block !important;
+  }
+  
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* 觸控優化 */
+@media (max-width: 768px) {
+  .touch-optimized {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .ant-btn.touch-optimized {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  
+  .ant-input.touch-optimized {
+    height: 44px;
+    font-size: 16px; /* 防止 iOS 縮放 */
+  }
+}
+
+/* 加載動畫優化 */
+.ant-spin-container {
+  transition: opacity 0.3s ease;
+}
+
+/* 無障礙設計 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =================================
+   進階分析頁面特殊樣式
+   ================================= */
+
+/* 風險等級行樣式 */
+.risk-critical-row {
+  background-color: #fff2f0 !important;
+  border-left: 4px solid #f5222d;
+}
+
+.risk-high-row {
+  background-color: #fff7e6 !important;
+  border-left: 4px solid #faad14;
+}
+
+.risk-medium-row {
+  background-color: #f6ffed !important;
+  border-left: 4px solid #52c41a;
+}
+
+/* KPI 指標卡片動畫 */
+.kpi-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #1890ff, transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* 數據載入動畫 */
+.data-loading {
+  position: relative;
+}
+
+.data-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.5) 50%, transparent 75%);
+  animation: loading-wave 1.5s infinite;
+}
+
+@keyframes loading-wave {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* 財務健康狀態指示器 */
+.health-indicator {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.health-indicator.excellent {
+  background-color: #52c41a;
+  box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
+}
+
+.health-indicator.good {
+  background-color: #1890ff;
+  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.2);
+}
+
+.health-indicator.warning {
+  background-color: #faad14;
+  box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.2);
+}
+
+.health-indicator.danger {
+  background-color: #f5222d;
+  box-shadow: 0 0 0 3px rgba(245, 34, 45, 0.2);
+  animation: pulse-danger 1.5s infinite;
+}
+
+@keyframes pulse-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* 趨勢箭頭動畫 */
+.trend-icon {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.trend-icon.up {
+  color: #52c41a;
+  animation: bounce-up 1s ease-in-out;
+}
+
+.trend-icon.down {
+  color: #f5222d;
+  animation: bounce-down 1s ease-in-out;
+}
+
+@keyframes bounce-up {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  60% { transform: translateY(-1px); }
+}
+
+@keyframes bounce-down {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(3px); }
+  60% { transform: translateY(1px); }
+}
+
+/* 圖表工具提示樣式增強 */
+.recharts-tooltip-wrapper {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(10px);
+}
+
+.recharts-default-tooltip {
+  border: none !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 深色模式支持 - 暫時停用以避免圖表背景問題 */
+/* 
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #141414;
+    color: #ffffff;
+  }
+  
+  .ant-card {
+    background-color: #1f1f1f;
+    border-color: #434343;
+  }
+  
+  .ant-table {
+    background-color: #1f1f1f;
+  }
+  
+  .ant-table-thead > tr > th {
+    background-color: #262626;
+    border-color: #434343;
+    color: #ffffff;
+  }
+  
+  .ant-table-tbody > tr > td {
+    border-color: #434343;
+    color: #ffffff;
+  }
+  
+  .recharts-default-tooltip {
+    background: rgba(31, 31, 31, 0.95) !important;
+    color: #ffffff !important;
+  }
+}
+*/
+
+/* 性能優化 */
+.gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 高性能滾動 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 焦點指示器增強 */
+.ant-btn:focus,
+.ant-input:focus,
+.ant-select-selector:focus {
+  outline: 2px solid rgba(24, 144, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* 打印樣式 */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .ant-layout-sider,
+  .ant-btn,
+  .no-print {
+    display: none !important;
+  }
+  
+  .ant-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
+  
+  .chart-container {
+    break-inside: avoid;
+  }
+}
+
+/* =================================
+   修復儀表板背景和導覽列問題
+   ================================= */
+
+/* 確保整個應用背景正確 */
+.ant-layout {
+  background: #f0f2f5 !important;
+}
+
+.ant-layout-content {
+  background: #f0f2f5 !important;
+}
+
+/* 側邊欄樣式修復 */
+.ant-layout-sider {
+  background: white !important;
+}
+
+.ant-menu {
+  background: white !important;
+}
+
+.ant-menu-item {
+  background: white !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+.ant-menu-item:hover {
+  background: #e6f7ff !important;
+}
+
+.ant-menu-item-selected {
+  background: #e6f7ff !important;
+}
+
+.ant-menu-item a {
+  pointer-events: auto !important;
+}
+
+.ant-layout-sider .ant-menu {
+  pointer-events: auto !important;
+}
+
+.ant-layout-sider {
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
+/* 確保所有卡片背景正確 */
+.ant-card {
+  background: white !important;
+}
+
+.ant-card-body {
+  background: white !important;
+}
+
+/* Dashboard 特定修復 */
+.chart-container,
+.chart-container * {
+  background: white !important;
+}
+
+/* 移除過於廣泛的樣式重置以提升性能 */
+
+.ant-layout,
+.ant-layout-content,
+.chart-container,
+.ant-card {
+  background-color: white !important;
+}
+
+.ant-layout,
+.ant-layout-content {
+  background-color: #f0f2f5 !important;
+}

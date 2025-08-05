@@ -134,44 +134,131 @@ const Settings = () => {
     }
   }
 
-  const handleExportData = async () => {
+
+  const handleExportData = async (format = 'json') => {
+    setLoading(true)
     try {
-      message.info('開始匯出資料...')
-      
-      const { exportToExcel, exportToCSV, generateFileName } = await import('../utils/exportUtils')
-      
-      // 模擬匯出所有系統數據
-      const allData = [
-        { '數據類型': '公司資訊', '項目': '公司名稱', '內容': companyInfo.name },
-        { '數據類型': '公司資訊', '項目': '統一編號', '內容': companyInfo.taxId },
-        { '數據類型': '公司資訊', '項目': '地址', '內容': companyInfo.address },
-        { '數據類型': '公司資訊', '項目': '電話', '內容': companyInfo.phone },
-        { '數據類型': '公司資訊', '項目': '郵件', '內容': companyInfo.email },
-        { '數據類型': '系統設定', '項目': '貨幣', '內容': systemSettings.currency },
-        { '數據類型': '系統設定', '項目': '日期格式', '內容': systemSettings.dateFormat },
-        { '數據類型': '系統設定', '項目': '時區', '內容': systemSettings.timezone },
-        { '數據類型': '系統設定', '項目': '語言', '內容': systemSettings.language },
-      ]
-      
-      const filename = generateFileName('系統設定匯出', 'xlsx')
-      await exportToExcel(allData, filename, '系統設定')
-      
-      message.success('資料匯出完成!')
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/settings/export-data?format=${format}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        
+        const today = new Date().toISOString().split('T')[0]
+        link.download = `financial_data_${today}.${format}`
+        
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        window.URL.revokeObjectURL(url)
+        message.success('資料匯出成功！')
+      } else {
+        const result = await response.json()
+        throw new Error(result.message || '匯出失敗')
+      }
     } catch (error) {
       console.error('匯出失敗:', error)
-      message.error('匯出失敗，請重試')
+      message.error(`匯出失敗: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleImportData = (file) => {
-    message.info('開始匯入資料...')
-    // 這裡可以實現資料匯入功能
+  const handleImportData = async (file) => {
+    setLoading(true)
+    try {
+      // 檢查檔案類型
+      const allowedTypes = ['.xlsx', '.xls', '.csv', '.json']
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+      
+      if (!allowedTypes.includes(fileExtension)) {
+        throw new Error('不支援的檔案格式，請選擇 Excel(.xlsx/.xls)、CSV(.csv) 或 JSON(.json) 檔案')
+      }
+
+      // 檢查檔案大小 (最大 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('檔案大小不能超過 10MB')
+      }
+
+      message.info('開始匯入資料...')
+
+      const formData = new FormData()
+      
+      if (fileExtension === '.json') {
+        // 處理 JSON 檔案（通常是備份檔案）
+        const fileContent = await file.text()
+        const jsonData = JSON.parse(fileContent)
+        
+        const token = localStorage.getItem('token')
+        const response = await fetch('/api/settings/import-data', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: jsonData,
+            overwrite: false // 可以根據需要調整
+          })
+        })
+
+        const result = await response.json()
+        
+        if (result.success) {
+          message.success('資料匯入成功！')
+        } else {
+          throw new Error(result.message || '匯入失敗')
+        }
+      } else {
+        // 處理 Excel/CSV 檔案
+        // 這裡可以擴展實作 CSV/Excel 解析功能
+        message.warning('Excel/CSV 匯入功能開發中，目前僅支援 JSON 格式的備份檔案')
+      }
+      
+    } catch (error) {
+      console.error('匯入失敗:', error)
+      message.error(`匯入失敗: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+    
     return false // 阻止自動上傳
   }
 
-  const handleBackup = () => {
-    message.success('資料備份已開始，完成後會通知您')
-    // 這裡可以實現備份功能
+  const handleBackup = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/settings/backup', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        message.success(`資料備份成功！檔案大小: ${(result.data.size / 1024 / 1024).toFixed(2)} MB`)
+      } else {
+        throw new Error(result.message || '備份失敗')
+      }
+    } catch (error) {
+      console.error('備份失敗:', error)
+      message.error(`備份失敗: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -531,14 +618,19 @@ const Settings = () => {
               <div>
                 <Text strong>資料匯入</Text>
                 <br />
-                <Text type="secondary">從Excel或CSV檔案匯入財務資料</Text>
+                <Text type="secondary">從備份檔案(JSON)或Excel/CSV檔案匯入財務資料</Text>
                 <br />
                 <Upload
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.xls,.csv,.json"
                   beforeUpload={handleImportData}
                   showUploadList={false}
+                  disabled={loading}
                 >
-                  <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
+                  <Button 
+                    icon={<UploadOutlined />} 
+                    loading={loading}
+                    style={{ marginTop: 8 }}
+                  >
                     選擇檔案
                   </Button>
                 </Upload>
@@ -551,13 +643,22 @@ const Settings = () => {
                 <br />
                 <Text type="secondary">建立完整的資料備份，包含所有財務記錄</Text>
                 <br />
-                <Button 
-                  icon={<DatabaseOutlined />} 
-                  onClick={handleBackup}
-                  style={{ marginTop: 8 }}
-                >
-                  建立備份
-                </Button>
+                <Space style={{ marginTop: 8 }}>
+                  <Button 
+                    icon={<DatabaseOutlined />} 
+                    onClick={handleBackup}
+                    loading={loading}
+                  >
+                    建立備份
+                  </Button>
+                  <Button 
+                    icon={<DownloadOutlined />} 
+                    onClick={() => handleExportData('json')}
+                    loading={loading}
+                  >
+                    匯出資料
+                  </Button>
+                </Space>
               </div>
             </Space>
           </Card>

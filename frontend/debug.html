@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端調試頁面</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f2f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #1890ff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .button:hover {
+            background: #40a9ff;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background: #f6ffed; border: 1px solid #b7eb8f; color: #52c41a; }
+        .error { background: #fff2f0; border: 1px solid #ffccc7; color: #f5222d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 財務阿姨系統 - 前端調試</h1>
+        
+        <h3>📋 系統狀態檢查</h3>
+        <div id="status"></div>
+        
+        <h3>🔗 快速連結</h3>
+        <a href="/" class="button">🏠 主頁</a>
+        <a href="/login" class="button">🔑 登入頁面</a>
+        <a href="/register" class="button">📝 註冊頁面</a>
+        
+        <h3>🛠️ 故障排除</h3>
+        <button class="button" onclick="clearCache()">🗑️ 清除本地存儲</button>
+        <button class="button" onclick="testAPI()">🔍 測試 API</button>
+        <button class="button" onclick="checkServices()">⚙️ 檢查服務</button>
+        
+        <div id="debug-info"></div>
+    </div>
+
+    <script>
+        // 檢查系統狀態
+        async function checkStatus() {
+            const status = document.getElementById('status');
+            
+            // 檢查 React 是否載入
+            const reactLoaded = typeof React !== 'undefined';
+            
+            // 檢查當前 URL
+            const currentURL = window.location.href;
+            
+            // 檢查本地存儲
+            const hasToken = localStorage.getItem('token');
+            const hasUser = localStorage.getItem('user');
+            
+            status.innerHTML = `
+                <div class="status ${reactLoaded ? 'success' : 'error'}">
+                    React 載入狀態: ${reactLoaded ? '✅ 已載入' : '❌ 未載入'}
+                </div>
+                <div class="status success">
+                    當前 URL: ${currentURL}
+                </div>
+                <div class="status ${hasToken ? 'success' : 'error'}">
+                    登入狀態: ${hasToken ? '✅ 已登入' : '❌ 未登入'}
+                </div>
+            `;
+        }
+        
+        // 清除快取
+        function clearCache() {
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('✅ 本地存儲已清除！請重新載入頁面。');
+            window.location.reload();
+        }
+        
+        // 測試 API
+        async function testAPI() {
+            const debugInfo = document.getElementById('debug-info');
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                debugInfo.innerHTML = `
+                    <h4>🔍 API 測試結果</h4>
+                    <div class="status success">
+                        ✅ API 連接正常<br>
+                        回應: ${JSON.stringify(data, null, 2)}
+                    </div>
+                `;
+            } catch (error) {
+                debugInfo.innerHTML = `
+                    <h4>🔍 API 測試結果</h4>
+                    <div class="status error">
+                        ❌ API 連接失敗<br>
+                        錯誤: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // 檢查服務
+        function checkServices() {
+            const debugInfo = document.getElementById('debug-info');
+            debugInfo.innerHTML = `
+                <h4>⚙️ 服務檢查</h4>
+                <p><strong>前端服務:</strong> http://localhost:3000</p>
+                <p><strong>後端服務:</strong> http://localhost:5001</p>
+                <p><strong>瀏覽器:</strong> ${navigator.userAgent}</p>
+                <p><strong>時間:</strong> ${new Date().toLocaleString()}</p>
+            `;
+        }
+        
+        // 頁面載入時執行
+        window.onload = checkStatus;
+    </script>
+</body>
+</html> 

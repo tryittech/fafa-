@@ -1,16 +1,18 @@
 import express from 'express'
 import { query, run, get } from '../utils/database.js'
 import { body, validationResult } from 'express-validator'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// 獲取所有支出記錄
-router.get('/', async (req, res) => {
+// 獲取支出記錄 (需要認證)
+router.get('/', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { page = 1, limit = 10, status, category, vendor, startDate, endDate } = req.query
     
-    let sql = 'SELECT * FROM expense WHERE 1=1'
-    const params = []
+    let sql = 'SELECT * FROM expense WHERE user_id = ?'
+    const params = [userId]
     
     // 篩選條件
     if (status) {
@@ -48,9 +50,9 @@ router.get('/', async (req, res) => {
     
     const expenseRecords = await query(sql, params)
     
-    // 獲取總數
-    let countSql = 'SELECT COUNT(*) as total FROM expense WHERE 1=1'
-    const countParams = params.slice(0, -2) // 移除 LIMIT 和 OFFSET 參數
+    // 獲取總數 (只計算當前用戶的記錄)
+    let countSql = 'SELECT COUNT(*) as total FROM expense WHERE user_id = ?'
+    const countParams = [userId]
     
     if (status) {
       countSql += ' AND status = ?'
@@ -99,12 +101,13 @@ router.get('/', async (req, res) => {
   }
 })
 
-// 獲取單一支出記錄
-router.get('/:id', async (req, res) => {
+// 獲取單一支出記錄 (需要認證)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.userId
     
-    const expenseRecord = await get('SELECT * FROM expense WHERE id = ?', [id])
+    const expenseRecord = await get('SELECT * FROM expense WHERE id = ? AND user_id = ?', [id, userId])
     
     if (!expenseRecord) {
       return res.status(404).json({
@@ -126,8 +129,8 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// 新增支出記錄
-router.post('/', [
+// 新增支出記錄 (需要認證)
+router.post('/', authenticateToken, [
   body('date').notEmpty().withMessage('日期為必填'),
   body('vendor').notEmpty().withMessage('供應商為必填'),
   body('description').notEmpty().withMessage('描述為必填'),
@@ -148,6 +151,7 @@ router.post('/', [
       })
     }
     
+    const userId = req.user.userId
     const {
       date,
       vendor,
@@ -165,16 +169,16 @@ router.post('/', [
     const taxAmount = amount * (taxRate / 100)
     const totalAmount = amount + taxAmount
     
-    // 生成支出編號
-    const countResult = await get('SELECT COUNT(*) as count FROM expense')
+    // 生成支出編號 (只計算當前用戶的記錄)
+    const countResult = await get('SELECT COUNT(*) as count FROM expense WHERE user_id = ?', [userId])
     const expenseId = `EXP${String(countResult.count + 1).padStart(3, '0')}`
     
     const result = await run(`
       INSERT INTO expense (
-        expense_id, date, vendor, description, category, amount, tax_rate, 
+        expense_id, user_id, date, vendor, description, category, amount, tax_rate, 
         tax_amount, total_amount, status, payment_method, receipt_path, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [expenseId, date, vendor, description, category, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, receiptPath, notes])
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [expenseId, userId, date, vendor, description, category, amount, taxRate, taxAmount, totalAmount, status, paymentMethod, receiptPath, notes])
     
     // 獲取新增的記錄
     const newRecord = await get('SELECT * FROM expense WHERE id = ?', [result.id])
@@ -193,8 +197,8 @@ router.post('/', [
   }
 })
 
-// 更新支出記錄
-router.put('/:id', [
+// 更新支出記錄 (需要認證)
+router.put('/:id', authenticateToken, [
   body('date').notEmpty().withMessage('日期為必填'),
   body('vendor').notEmpty().withMessage('供應商為必填'),
   body('description').notEmpty().withMessage('描述為必填'),
@@ -216,6 +220,7 @@ router.put('/:id', [
     }
     
     const { id } = req.params
+    const userId = req.user.userId
     const {
       date,
       vendor,
@@ -229,12 +234,12 @@ router.put('/:id', [
       notes
     } = req.body
     
-    // 檢查記錄是否存在
-    const existingRecord = await get('SELECT * FROM expense WHERE id = ?', [id])
+    // 檢查記錄是否存在且屬於當前用戶
+    const existingRecord = await get('SELECT * FROM expense WHERE id = ? AND user_id = ?', [id, userId])
     if (!existingRecord) {
       return res.status(404).json({
         success: false,
-        error: '找不到該支出記錄'
+        error: '找不到該支出記錄或您沒有權限修改'
       })
     }
     
@@ -274,21 +279,22 @@ router.put('/:id', [
   }
 })
 
-// 刪除支出記錄
-router.delete('/:id', async (req, res) => {
+// 刪除支出記錄 (需要認證)
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.userId
     
-    // 檢查記錄是否存在
-    const existingRecord = await get('SELECT * FROM expense WHERE id = ?', [id])
+    // 檢查記錄是否存在且屬於當前用戶
+    const existingRecord = await get('SELECT * FROM expense WHERE id = ? AND user_id = ?', [id, userId])
     if (!existingRecord) {
       return res.status(404).json({
         success: false,
-        error: '找不到該支出記錄'
+        error: '找不到該支出記錄或您沒有權限刪除'
       })
     }
     
-    const result = await run('DELETE FROM expense WHERE id = ?', [id])
+    const result = await run('DELETE FROM expense WHERE id = ? AND user_id = ?', [id, userId])
     
     if (result.changes === 0) {
       return res.status(400).json({
@@ -311,8 +317,9 @@ router.delete('/:id', async (req, res) => {
 })
 
 // 獲取支出統計
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     let sql = `
@@ -325,9 +332,9 @@ router.get('/stats/summary', async (req, res) => {
         SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END) as pending_amount,
         SUM(CASE WHEN status = 'overdue' THEN total_amount ELSE 0 END) as overdue_amount
       FROM expense
-      WHERE 1=1
+      WHERE user_id = ?
     `
-    const params = []
+    const params = [userId]
     
     if (startDate) {
       sql += ' AND date >= ?'
@@ -355,8 +362,9 @@ router.get('/stats/summary', async (req, res) => {
 })
 
 // 獲取支出分類統計
-router.get('/stats/by-category', async (req, res) => {
+router.get('/stats/by-category', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId
     const { startDate, endDate } = req.query
     
     let sql = `
@@ -367,9 +375,9 @@ router.get('/stats/by-category', async (req, res) => {
         SUM(tax_amount) as total_tax,
         SUM(total_amount) as total_with_tax
       FROM expense
-      WHERE 1=1
+      WHERE user_id = ?
     `
-    const params = []
+    const params = [userId]
     
     if (startDate) {
       sql += ' AND date >= ?'
@@ -399,7 +407,7 @@ router.get('/stats/by-category', async (req, res) => {
 })
 
 // 支出趨勢洞察分析
-router.get('/insights/expense-trend', async (req, res) => {
+router.get('/insights/expense-trend', authenticateToken, async (req, res) => {
   try {
     // 獲取當前日期
     const now = new Date()
@@ -418,22 +426,24 @@ router.get('/insights/expense-trend', async (req, res) => {
     const currentMonthStr = String(currentMonth).padStart(2, '0')
     const lastMonthStr = String(lastMonth).padStart(2, '0')
     
+    const userId = req.user.userId
+    
     // 查詢本月支出總和
     const currentMonthSql = `
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM expense 
-      WHERE strftime('%Y-%m', date) = ?
+      WHERE user_id = ? AND strftime('%Y-%m', date) = ?
     `
-    const currentMonthResult = await get(currentMonthSql, [`${currentYear}-${currentMonthStr}`])
+    const currentMonthResult = await get(currentMonthSql, [userId, `${currentYear}-${currentMonthStr}`])
     const currentMonthTotal = currentMonthResult.total
     
     // 查詢上個月支出總和
     const lastMonthSql = `
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM expense 
-      WHERE strftime('%Y-%m', date) = ?
+      WHERE user_id = ? AND strftime('%Y-%m', date) = ?
     `
-    const lastMonthResult = await get(lastMonthSql, [`${lastYear}-${lastMonthStr}`])
+    const lastMonthResult = await get(lastMonthSql, [userId, `${lastYear}-${lastMonthStr}`])
     const lastMonthTotal = lastMonthResult.total
     
     // 計算差額和百分比變化

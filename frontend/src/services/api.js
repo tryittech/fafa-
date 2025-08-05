@@ -1,13 +1,16 @@
 // API 基礎配置
-const API_BASE_URL = '/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
 
 // 通用請求函數
 const request = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`
   
+  // 自動添加認證標頭
+  const token = localStorage.getItem('token')
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
     },
   }
 
@@ -283,6 +286,65 @@ export const taxAPI = {
   getResources: () => request('/tax/resources'),
 }
 
+// 預算管理 API
+export const budgetAPI = {
+  // 獲取預算列表
+  getList: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/budget?${searchParams.toString()}`)
+  },
+
+  // 獲取單筆預算
+  getById: (id) => request(`/budget/${id}`),
+
+  // 新增預算
+  create: (data) => request('/budget', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 更新預算
+  update: (id, data) => request(`/budget/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  // 刪除預算
+  delete: (id) => request(`/budget/${id}`, {
+    method: 'DELETE',
+  }),
+
+  // 獲取預算統計
+  getStatistics: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/budget/statistics?${searchParams.toString()}`)
+  },
+
+  // 獲取預算概覽
+  getOverview: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/budget/overview?${searchParams.toString()}`)
+  },
+
+  // 獲取預算類別
+  getCategories: () => request('/budget/categories'),
+}
+
 // 系統設定 API
 export const settingsAPI = {
   // 獲取公司資訊
@@ -370,6 +432,129 @@ export const setupResponseInterceptor = () => {
   // 例如：統一處理 401 未授權、500 服務器錯誤等
 }
 
+// 智能財務助手 API
+export const assistantAPI = {
+  // 智能分類建議
+  classifyTransaction: (data) => request('/assistant/classify-transaction', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 獲取智能提醒
+  getReminders: () => request('/assistant/reminders'),
+
+  // 獲取財務健康評分
+  getHealthScore: () => request('/assistant/health-score'),
+
+  // 生成智能報表
+  generateSmartReport: (data) => request('/assistant/generate-smart-report', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 獲取財務目標
+  getFinancialGoals: () => request('/assistant/financial-goals'),
+
+  // 獲取自動化建議
+  getAutomationSuggestions: () => request('/assistant/automation-suggestions'),
+
+  // 智能對話
+  chat: (data) => request('/assistant/chat', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 獲取智能見解
+  getInsights: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/assistant/insights?${searchParams.toString()}`)
+  },
+
+  // 獲取任務建議
+  getTaskSuggestions: () => request('/assistant/task-suggestions'),
+
+  // 備份管理
+  getBackupStatus: () => request('/assistant/backup-status'),
+  
+  createSmartBackup: (data) => request('/assistant/create-smart-backup', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  
+  verifyBackup: (data) => request('/assistant/verify-backup', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 智能收據識別
+  scanReceipt: (data) => request('/assistant/scan-receipt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  batchScanReceipts: (data) => request('/assistant/batch-scan-receipts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  getReceiptTemplates: () => request('/assistant/receipt-templates'),
+}
+
+// 進階分析 API
+export const analyticsAPI = {
+  // 獲取績效數據
+  getPerformance: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/analytics/performance?${searchParams.toString()}`)
+  },
+
+  // 獲取同期比較數據
+  getComparison: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/analytics/comparison?${searchParams.toString()}`)
+  },
+
+  // 獲取現金流預測
+  getCashflowForecast: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/analytics/cashflow-forecast?${searchParams.toString()}`)
+  },
+
+  // 獲取異常檢測
+  getAnomalyDetection: () => request('/analytics/anomaly-detection'),
+
+  // 獲取盈利能力分析
+  getProfitabilityAnalysis: (params = {}) => {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value)
+      }
+    })
+    return request(`/analytics/profitability-analysis?${searchParams.toString()}`)
+  },
+}
+
 export default {
   checkHealth,
   incomeAPI,
@@ -377,6 +562,9 @@ export default {
   dashboardAPI,
   reportsAPI,
   taxAPI,
+  budgetAPI,
   settingsAPI,
+  analyticsAPI,
+  assistantAPI,
   handleAPIError,
 } 

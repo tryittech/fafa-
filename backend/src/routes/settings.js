@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { query, run, get } from '../utils/database.js';
+import { authenticateToken } from '../middleware/auth.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
@@ -15,8 +16,9 @@ const router = express.Router();
 /**
  * 獲取公司資訊
  */
-router.get('/company-info', async (req, res) => {
+router.get('/company-info', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const companyInfo = await get(`
       SELECT 
         company_name,
@@ -29,8 +31,9 @@ router.get('/company-info', async (req, res) => {
         established_date,
         updated_at
       FROM company_info
+      WHERE user_id = ?
       LIMIT 1
-    `);
+    `, [userId]);
     
     res.json({
       success: true,
@@ -50,7 +53,7 @@ router.get('/company-info', async (req, res) => {
 /**
  * 更新公司資訊
  */
-router.put('/company-info', [
+router.put('/company-info', authenticateToken, [
   body('companyName').notEmpty().withMessage('公司名稱不能為空'),
   body('taxId').optional().isLength({ min: 8, max: 8 }).withMessage('統一編號必須為 8 位數字'),
   body('address').optional().isString().withMessage('地址格式不正確'),
@@ -81,8 +84,10 @@ router.put('/company-info', [
       establishedDate
     } = req.body;
 
+    const userId = req.user.userId;
+    
     // 檢查是否已有公司資訊
-    const existing = await get('SELECT id FROM company_info LIMIT 1');
+    const existing = await get('SELECT id FROM company_info WHERE user_id = ? LIMIT 1', [userId]);
     
     if (existing) {
       // 更新現有記錄
@@ -97,7 +102,7 @@ router.put('/company-info', [
           business_type = ?,
           established_date = ?,
           updated_at = ?
-        WHERE id = ?
+        WHERE id = ? AND user_id = ?
       `, [
         companyName,
         taxId,
@@ -108,12 +113,14 @@ router.put('/company-info', [
         businessType,
         establishedDate,
         new Date().toISOString(),
-        existing.id
+        existing.id,
+        userId
       ]);
     } else {
       // 創建新記錄
       await run(`
         INSERT INTO company_info (
+          user_id,
           company_name,
           tax_id,
           address,
@@ -124,8 +131,9 @@ router.put('/company-info', [
           established_date,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
+        userId,
         companyName,
         taxId,
         address,
@@ -156,7 +164,7 @@ router.put('/company-info', [
 /**
  * 獲取系統設定
  */
-router.get('/system-settings', async (req, res) => {
+router.get('/system-settings', authenticateToken, async (req, res) => {
   try {
     const settings = await query(`
       SELECT 
@@ -217,7 +225,7 @@ router.get('/system-settings', async (req, res) => {
 /**
  * 更新系統設定
  */
-router.put('/system-settings', [
+router.put('/system-settings', authenticateToken, [
   body('settings').isObject().withMessage('設定必須為物件格式')
 ], async (req, res) => {
   try {
@@ -271,8 +279,9 @@ router.put('/system-settings', [
 /**
  * 匯出資料
  */
-router.get('/export-data', async (req, res) => {
+router.get('/export-data', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const { format = 'json' } = req.query;
     
     if (format !== 'json' && format !== 'csv') {
@@ -282,20 +291,24 @@ router.get('/export-data', async (req, res) => {
       });
     }
     
-    // 獲取所有資料表
-    const tables = ['income', 'expense', 'company_info', 'system_settings', 'tax_calculations'];
+    // 獲取當前用戶的數據
+    const userTables = ['income', 'expense', 'company_info', 'tax_calculations'];
     const exportData = {};
     
-    for (const table of tables) {
-      const data = await query(`SELECT * FROM ${table}`);
+    for (const table of userTables) {
+      const data = await query(`SELECT * FROM ${table} WHERE user_id = ?`, [userId]);
       exportData[table] = data;
     }
+    
+    // 系統設定不需要用戶隔離
+    const systemSettings = await query(`SELECT * FROM system_settings`);
+    exportData.system_settings = systemSettings;
     
     // 添加匯出資訊
     exportData.exportInfo = {
       exportDate: new Date().toISOString(),
       version: '1.0.0',
-      tables: tables
+      tables: userTables
     };
     
     if (format === 'json') {
@@ -331,8 +344,9 @@ router.get('/export-data', async (req, res) => {
 /**
  * 匯入資料
  */
-router.post('/import-data', async (req, res) => {
+router.post('/import-data', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.userId;
     const { data, overwrite = false } = req.body;
     
     if (!data || typeof data !== 'object') {
@@ -346,19 +360,30 @@ router.post('/import-data', async (req, res) => {
     await run('BEGIN TRANSACTION');
     
     try {
-      const tables = ['income', 'expense', 'company_info', 'system_settings', 'tax_calculations'];
+      const userTables = ['income', 'expense', 'company_info', 'tax_calculations'];
+      const systemTables = ['system_settings'];
       
-      for (const table of tables) {
+      // 處理用戶相關資料
+      for (const table of userTables) {
         if (data[table] && Array.isArray(data[table])) {
           if (overwrite) {
-            // 清空現有資料
-            await run(`DELETE FROM ${table}`);
+            // 清空當前用戶的資料
+            await run(`DELETE FROM ${table} WHERE user_id = ?`, [userId]);
           }
           
-          // 匯入資料
+          // 匯入資料（確保綁定當前用戶）
           for (const record of data[table]) {
             const columns = Object.keys(record).filter(key => key !== 'id');
-            const values = columns.map(col => record[col]);
+            if (!columns.includes('user_id')) {
+              columns.push('user_id');
+            }
+            
+            const values = columns.map(col => {
+              if (col === 'user_id') {
+                return userId;
+              }
+              return record[col];
+            });
             const placeholders = columns.map(() => '?').join(', ');
             
             await run(`
@@ -368,6 +393,9 @@ router.post('/import-data', async (req, res) => {
           }
         }
       }
+      
+      // 處理系統設定（僅管理員可匯入）
+      // 這裡可以加入權限檢查
       
       // 提交交易
       await run('COMMIT');
@@ -394,7 +422,7 @@ router.post('/import-data', async (req, res) => {
 /**
  * 創建資料備份
  */
-router.post('/backup', async (req, res) => {
+router.post('/backup', authenticateToken, async (req, res) => {
   try {
     const backupDir = path.join(__dirname, '../../backups');
     
@@ -449,7 +477,7 @@ router.post('/backup', async (req, res) => {
 /**
  * 獲取備份列表
  */
-router.get('/backups', async (req, res) => {
+router.get('/backups', authenticateToken, async (req, res) => {
   try {
     const backupDir = path.join(__dirname, '../../backups');
     
@@ -502,7 +530,7 @@ router.get('/backups', async (req, res) => {
 /**
  * 還原備份
  */
-router.post('/restore', [
+router.post('/restore', authenticateToken, [
   body('backupFile').notEmpty().withMessage('備份檔案名稱不能為空')
 ], async (req, res) => {
   try {
@@ -560,7 +588,7 @@ router.post('/restore', [
 /**
  * 刪除備份
  */
-router.delete('/backups/:filename', async (req, res) => {
+router.delete('/backups/:filename', authenticateToken, async (req, res) => {
   try {
     const { filename } = req.params;
     const backupDir = path.join(__dirname, '../../backups');
@@ -596,12 +624,14 @@ router.delete('/backups/:filename', async (req, res) => {
 /**
  * 獲取系統資訊
  */
-router.get('/system-info', async (req, res) => {
+router.get('/system-info', authenticateToken, async (req, res) => {
   try {
-    // 獲取資料庫統計資訊
-    const incomeCount = await get('SELECT COUNT(*) as count FROM income');
-    const expenseCount = await get('SELECT COUNT(*) as count FROM expense');
-    const taxCalculationCount = await get('SELECT COUNT(*) as count FROM tax_calculations');
+    const userId = req.user.userId;
+    
+    // 獲取當前用戶的數據統計
+    const incomeCount = await get('SELECT COUNT(*) as count FROM income WHERE user_id = ?', [userId]);
+    const expenseCount = await get('SELECT COUNT(*) as count FROM expense WHERE user_id = ?', [userId]);
+    const taxCalculationCount = await get('SELECT COUNT(*) as count FROM tax_calculations WHERE user_id = ?', [userId]);
     
     // 獲取資料庫檔案大小
     const dbPath = path.join(__dirname, '../../database/fafa.db');
@@ -661,7 +691,7 @@ router.get('/system-info', async (req, res) => {
 /**
  * 重置系統設定
  */
-router.post('/reset-settings', async (req, res) => {
+router.post('/reset-settings', authenticateToken, async (req, res) => {
   try {
     // 重置系統設定為預設值
     const defaultSettings = [

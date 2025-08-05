@@ -30,7 +30,7 @@ import {
   CalendarOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import budgetAPI from '../services/budgetAPI'
+import { budgetAPI } from '../services/api'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -57,9 +57,9 @@ const BudgetManagement = () => {
       
       // 並行載入所有數據
       const [budgetsRes, categoriesRes, overviewRes] = await Promise.all([
-        budgetAPI.getBudgets({ period: currentPeriod, budget_type: budgetType }),
+        budgetAPI.getList({ period: currentPeriod, budget_type: budgetType }),
         budgetAPI.getCategories(),
-        budgetAPI.getOverview(currentPeriod)
+        budgetAPI.getOverview({ period: currentPeriod })
       ])
 
       if (budgetsRes.success) setBudgets(budgetsRes.data)
@@ -102,7 +102,7 @@ const BudgetManagement = () => {
       content: `確定要刪除預算「${record.name}」嗎？`,
       onOk: async () => {
         try {
-          const response = await budgetAPI.deleteBudget(record.id)
+          const response = await budgetAPI.delete(record.id)
           if (response.success) {
             message.success('預算刪除成功')
             loadData()
@@ -126,9 +126,9 @@ const BudgetManagement = () => {
 
       let response
       if (editingRecord) {
-        response = await budgetAPI.updateBudget(editingRecord.id, budgetData)
+        response = await budgetAPI.update(editingRecord.id, budgetData)
       } else {
-        response = await budgetAPI.createBudget(budgetData)
+        response = await budgetAPI.create(budgetData)
       }
 
       if (response.success) {
