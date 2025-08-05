@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 測試</title>
+</head>
+<body>
+    <h1>API 連接測試</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+            
+            try {
+                // 測試健康檢查
+                const healthResponse = await fetch('/api/health');
+                const healthData = await healthResponse.json();
+                results.innerHTML += `<p>✅ 健康檢查: ${JSON.stringify(healthData)}</p>`;
+                
+                // 測試儀表板 API
+                const dashboardResponse = await fetch('/api/dashboard/overview');
+                const dashboardData = await dashboardResponse.json();
+                results.innerHTML += `<p>✅ 儀表板 API: ${JSON.stringify(dashboardData)}</p>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p>❌ 錯誤: ${error.message}</p>`;
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html> 
